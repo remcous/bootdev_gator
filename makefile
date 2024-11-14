@@ -2,7 +2,7 @@
 BINARY_NAME=gator
 
 # Define the Go source file
-SRC=main.go
+SRC=.
 
 # Define the Goose command and the migration directory
 GOOSE_CMD=goose
