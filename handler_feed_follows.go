@@ -9,14 +9,9 @@ import (
 	"github.com/remcous/bootdev_gator/internal/database"
 )
 
-func handlerFollow(s *state, cmd command) error {
+func handlerFollow(s *state, cmd command, user database.User) error {
 	if len(cmd.Args) != 1 {
 		return fmt.Errorf("usage: %s <url>", cmd.Name)
-	}
-
-	user, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
-	if err != nil {
-		return fmt.Errorf("unable to get user [%s] from database, %w", s.cfg.CurrentUserName, err)
 	}
 
 	feed, err := s.db.GetFeedByUrl(context.Background(), cmd.Args[0])
@@ -43,23 +38,18 @@ func handlerFollow(s *state, cmd command) error {
 	return nil
 }
 
-func handlerFollowing(s *state, cmd command) error {
-	currentUser, err := s.db.GetUser(context.Background(), s.cfg.CurrentUserName)
-	if err != nil {
-		return fmt.Errorf("unable to get user [%s] from database, %w", s.cfg.CurrentUserName, err)
-	}
-
-	followedFeeds, err := s.db.GetFeedFollowsForUser(context.Background(), currentUser.ID)
+func handlerFollowing(s *state, cmd command, user database.User) error {
+	followedFeeds, err := s.db.GetFeedFollowsForUser(context.Background(), user.ID)
 	if err != nil {
 		return fmt.Errorf("unable to get followed feeds from database, %w", err)
 	}
 
 	if len(followedFeeds) == 0 {
-		fmt.Println("No feed follows found for user [%s]", currentUser.Name)
+		fmt.Printf("No feed follows found for user [%s]", user.Name)
 		return nil
 	}
 
-	fmt.Printf("%s followed feeds:\n", currentUser.Name)
+	fmt.Printf("%s followed feeds:\n", user.Name)
 	for _, feed := range followedFeeds {
 		fmt.Printf("* %s\n", feed.FeedName)
 	}

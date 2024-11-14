@@ -9,15 +9,9 @@ import (
 	"github.com/remcous/bootdev_gator/internal/database"
 )
 
-func handlerAddFeed(s *state, cmd command) error {
+func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.Args) != 2 {
 		return fmt.Errorf("usage: %s <name> <url>", cmd.Name)
-	}
-
-	currentUserName := s.cfg.CurrentUserName
-	currentUser, err := s.db.GetUser(context.Background(), currentUserName)
-	if err != nil {
-		return fmt.Errorf("unable to access user [%s], %w", currentUserName, err)
 	}
 
 	feedName := cmd.Args[0]
@@ -31,7 +25,7 @@ func handlerAddFeed(s *state, cmd command) error {
 			UpdatedAt: time.Now().UTC(),
 			Name:      feedName,
 			Url:       feedUrl,
-			UserID:    currentUser.ID,
+			UserID:    user.ID,
 		},
 	)
 	if err != nil {
@@ -46,7 +40,7 @@ func handlerAddFeed(s *state, cmd command) error {
 			CreatedAt: time.Now().UTC(),
 			UpdatedAt: time.Now().UTC(),
 			FeedID:    feed.ID,
-			UserID:    currentUser.ID,
+			UserID:    user.ID,
 		},
 	)
 	if err != nil {
@@ -54,7 +48,7 @@ func handlerAddFeed(s *state, cmd command) error {
 	}
 
 	fmt.Println("Feed created successfully:")
-	printFeed(feed, currentUser)
+	printFeed(feed, user)
 	fmt.Println()
 	fmt.Println("Feed follow created successfully:")
 	printFeedFollow(feedFollow.UserName, feedFollow.FeedName)
