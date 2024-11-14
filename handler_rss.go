@@ -3,10 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"time"
-
-	"github.com/google/uuid"
-	"github.com/remcous/bootdev_gator/internal/database"
 )
 
 /*******************************************************************************
@@ -24,58 +20,6 @@ func handlerAgg(s *state, cmd command) error {
 	}
 
 	fmt.Printf("Feed: %+v\n", feed)
-
-	return nil
-}
-
-func handlerAddFeed(s *state, cmd command) error {
-	if len(cmd.Args) != 2 {
-		return fmt.Errorf("usage: %s <name> <url>", cmd.Name)
-	}
-
-	currentUserName := s.cfg.CurrentUserName
-	currentUser, err := s.db.GetUser(context.Background(), currentUserName)
-	if err != nil {
-		return fmt.Errorf("unable to access user [%s], %w", currentUserName, err)
-	}
-
-	feedName := cmd.Args[0]
-	feedUrl := cmd.Args[1]
-
-	feed, err := s.db.CreateFeed(
-		context.Background(),
-		database.CreateFeedParams{
-			ID:        uuid.New(),
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-			Name:      feedName,
-			Url:       feedUrl,
-			UserID:    currentUser.ID,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("unable to create feed, %w", err)
-	}
-
-	fmt.Printf("New feed record created: %+v\n", feed)
-
-	return nil
-}
-
-func handlerFeeds(s *state, _ command) error {
-	feeds, err := s.db.GetFeeds(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to get feeds from database, %w", err)
-	}
-
-	for _, feed := range feeds {
-		user, err := s.db.GetUserByID(context.Background(), feed.UserID)
-		if err != nil {
-			return fmt.Errorf("failed to get user with ID [%s], %w", feed.UserID, err)
-		}
-
-		fmt.Printf("Name: %s, URL: %s, User: %s\n", feed.Name, feed.Url, user.Name)
-	}
 
 	return nil
 }
