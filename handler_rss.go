@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/remcous/bootdev_gator/internal/database"
 )
 
@@ -38,11 +42,11 @@ func scrapeFeeds(s *state) {
 	}
 	fmt.Println("Found a feed to fetch!")
 
-	scrapeFeed(s.db, nextFeed)
+	scrapeFeed(s, nextFeed)
 }
 
-func scrapeFeed(db *database.Queries, feed database.Feed) {
-	_, err := db.MarkFeedFetched(
+func scrapeFeed(s *state, feed database.Feed) {
+	_, err := s.db.MarkFeedFetched(
 		context.Background(),
 		feed.ID,
 	)
@@ -53,12 +57,81 @@ func scrapeFeed(db *database.Queries, feed database.Feed) {
 
 	feedData, err := fetchFeed(context.Background(), feed.Url)
 	if err != nil {
-		fmt.Printf("Unable to fetch updated feed [%s], %w", feed.Name, err)
+		fmt.Printf("Unable to fetch updated feed [%s], %v", feed.Name, err)
 		return
 	}
 
 	for _, item := range feedData.Channel.Item {
-		fmt.Printf("Found post: %s\n", item.Title)
+		publishedAt := sql.NullTime{}
+		if pubTime, err := time.Parse(time.RFC1123Z, item.PubDate); err == nil {
+			publishedAt = sql.NullTime{
+				Time:  pubTime,
+				Valid: true,
+			}
+		}
+
+		_, err = s.db.CreatePost(
+			context.Background(),
+			database.CreatePostParams{
+				ID:        uuid.New(),
+				CreatedAt: time.Now().UTC(),
+				UpdatedAt: time.Now().UTC(),
+				Title:     item.Title,
+				Url:       item.Link,
+				Description: sql.NullString{
+					String: item.Description,
+					Valid:  true,
+				},
+				PublishedAt: publishedAt,
+				FeedID:      feed.ID,
+			},
+		)
+		if err != nil {
+			if !strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+				fmt.Println(err)
+			}
+
+			fmt.Printf("Couldn't create post: %v", err)
+		}
 	}
-	fmt.Printf("Feed [%s] collected, %v posts found", feed.Name, len(feedData.Channel.Item))
+	fmt.Printf("Feed [%s] collected, %v posts found\n", feed.Name, len(feedData.Channel.Item))
+}
+
+func handlerBrowse(s *state, cmd command, user database.User) error {
+	var numPosts int
+	var err error
+	if len(cmd.Args) < 1 {
+		numPosts = 2
+	} else {
+		numPosts, err = strconv.Atoi(cmd.Args[0])
+		if err != nil {
+			numPosts = 2
+		}
+	}
+
+	posts, err := s.db.GetPostsForUser(
+		context.Background(),
+		database.GetPostsForUserParams{
+			UserID: user.ID,
+			Limit:  int32(numPosts),
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to get posts for user [%s]", user.Name)
+	}
+
+	fmt.Printf("Found %d posts for user %s:\n", len(posts), user.Name)
+	for _, post := range posts {
+		printPost(post)
+	}
+
+	return nil
+}
+
+func printPost(post database.Post) {
+	fmt.Printf("--- %s ---\n", post.Title)
+	fmt.Printf("Published: %s\n", post.PublishedAt.Time)
+	fmt.Printf("Description: %s\n", post.Description.String)
+	fmt.Printf("Link: %s\n", post.Url)
+	fmt.Println("==========================================")
 }
